@@ -1,0 +1,54 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>School Fees System</title>
+    <!-- Bootstrap CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="text-center my-4">
+    <!-- School logo -->
+    <img src="{% static 'students_app/images/pass.png' %}" alt="Anaku Logo" width="400" class="img-fluid mb-3">
+    <h1 class="mb-4">
+        ST JOSEPH PREPARATORY SCHOOL FEES MANAGEMENT SYSTEM
+    </h1>
+</div>
+
+<div class="container">
+    <div class="row justify-content-center g-3">
+
+        <!-- Add Student Button -->
+        <div class="col-md-3">
+            <a href="{% url 'add_student' %}" class="btn btn-primary w-100 p-3">
+                ➕ Add Student
+            </a>
+        </div>
+
+        <!-- View Students Button -->
+        <div class="col-md-3">
+            <a href="{% url 'view_students' %}" class="btn btn-success w-100 p-3">
+                📋 View Students
+            </a>
+        </div>
+
+        <!-- Manage Fees Button -->
+        <div class="col-md-3">
+            <a href="{% url 'add_fee' %}" class="btn btn-warning w-100 p-3">
+                💰 Manage Fees
+            </a>
+        </div>
+        
+        <!-- Reports Button -->
+        <div class="col-md-3">
+            <a href="{% url 'list_fees' %}" class="btn btn-info w-100 p-3">
+                📊 Reports
+            </a>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

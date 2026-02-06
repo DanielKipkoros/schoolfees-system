@@ -1,0 +1,18 @@
+# Django
+*.log
+*.pot
+*.pyc
+__pycache__/
+db.sqlite3
+media/
+
+# Virtual Environments
+env/
+venv/
+.venv/
+
+# VS Code
+.vscode/
+
+# Secrets
+.env

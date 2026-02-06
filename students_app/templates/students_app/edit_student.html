@@ -1,0 +1,129 @@
+{% extends "students_app/base.html" %}
+{% block title %}Edit Student{% endblock %}
+
+{% block content %}
+{% load widget_tweaks %}
+
+<div class="container my-5">
+    <div class="card shadow-lg border-0 rounded-4 mx-auto" style="max-width: 700px;">
+        <div class="card-header bg-warning text-white text-center rounded-top-4">
+            <h3 class="mb-0">✏️ Edit Student: {{ student.name }}</h3>
+        </div>
+
+        <div class="card-body p-4">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <!-- Name, Admission Number & Admission Year -->
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        {{ form.name.label_tag }}
+                        {{ form.name|add_class:"form-control" }}
+                        {% if form.name.errors %}
+                            <div class="text-danger">{{ form.name.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        {{ form.admission_number.label_tag }}
+                        {{ form.admission_number|add_class:"form-control" }}
+                        {% if form.admission_number.errors %}
+                            <div class="text-danger">{{ form.admission_number.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        {{ form.admission_year.label_tag }}
+                        {{ form.admission_year|add_class:"form-control" }}
+                        {% if form.admission_year.errors %}
+                            <div class="text-danger">{{ form.admission_year.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Grade, Boarder & Gender -->
+                <div class="row g-3 mt-3">
+                    <div class="col-md-4">
+                        {{ form.student_grade.label_tag }}
+                        {{ form.student_grade|add_class:"form-select" }}
+                        {% if form.student_grade.errors %}
+                            <div class="text-danger">{{ form.student_grade.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        {{ form.is_boarder.label_tag }}
+                        {{ form.is_boarder|add_class:"form-select" }}
+                        {% if form.is_boarder.errors %}
+                            <div class="text-danger">{{ form.is_boarder.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        {{ form.gender.label_tag }}
+                        {{ form.gender|add_class:"form-select" }}
+                        {% if form.gender.errors %}
+                            <div class="text-danger">{{ form.gender.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Date of Birth & Contact -->
+                <div class="row g-3 mt-3">
+                    <div class="col-md-6">
+                        {{ form.date_of_birth.label_tag }}
+                        {{ form.date_of_birth|add_class:"form-control" }}
+                        {% if form.date_of_birth.errors %}
+                            <div class="text-danger">{{ form.date_of_birth.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.phone_number.label_tag }}
+                        {{ form.phone_number|add_class:"form-control" }}
+                        {% if form.phone_number.errors %}
+                            <div class="text-danger">{{ form.phone_number.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Email & Parent Name -->
+                <div class="row g-3 mt-3">
+                    <div class="col-md-6">
+                        {{ form.email.label_tag }}
+                        {{ form.email|add_class:"form-control" }}
+                        {% if form.email.errors %}
+                            <div class="text-danger">{{ form.email.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.parent_name.label_tag }}
+                        {{ form.parent_name|add_class:"form-control" }}
+                        {% if form.parent_name.errors %}
+                            <div class="text-danger">{{ form.parent_name.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-warning btn-lg">💾 Save Changes</button>
+                    <a href="{% url 'view_students' %}" class="btn btn-secondary btn-lg">❌ Cancel</a>
+                    <a href="{% url 'home' %}" class="btn btn-primary btn-lg">
+                        ⬅ Back to Home
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

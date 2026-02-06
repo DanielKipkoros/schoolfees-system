@@ -1,0 +1,128 @@
+{% extends "students_app/base.html" %}
+{% block title %}Add New Student{% endblock %}
+
+{% block content %}
+{% load widget_tweaks %}
+
+<div class="container my-5">
+    <div class="card shadow-lg border-0 rounded-4 mx-auto" style="max-width: 700px;">
+        
+        <!-- Card Header -->
+        <div class="card-header bg-primary text-white text-center rounded-top-4">
+            <h3 class="mb-0">👤 Add New Student</h3>
+        </div>
+
+        <!-- Card Body -->
+        <div class="card-body p-4">
+
+            <!-- Back to Home Button at Top -->
+            <div class="mb-3">
+                <a href="{% url 'home' %}" class="btn btn-primary btn-sm">
+                    ⬅ Back to Home
+                </a>
+            </div>
+
+            <!-- Flash Messages -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <!-- Name, Admission Number & Admission Year -->
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        {{ form.name.label_tag }}
+                        {{ form.name|add_class:"form-control" }}
+                        {% if form.name.errors %}
+                            <div class="text-danger">{{ form.name.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.admission_number.label_tag }}
+                        {{ form.admission_number|add_class:"form-control" }}
+                        {% if form.admission_number.errors %}
+                            <div class="text-danger">{{ form.admission_number.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.admission_year.label_tag }}
+                        {{ form.admission_year|add_class:"form-control" }}
+                        {% if form.admission_year.errors %}
+                            <div class="text-danger">{{ form.admission_year.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Grade, Boarder & Gender -->
+                <div class="row g-3 mt-3">
+                    <div class="col-md-4">
+                        {{ form.student_grade.label_tag }}
+                        {{ form.student_grade|add_class:"form-select" }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.is_boarder.label_tag }}
+                        {{ form.is_boarder|add_class:"form-select" }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.gender.label_tag }}
+                        {{ form.gender|add_class:"form-select" }}
+                    </div>
+                </div>
+
+                <!-- Date of Birth & Contact -->
+                <div class="row g-3 mt-3">
+                    <div class="col-md-6">
+                        {{ form.date_of_birth.label_tag }}
+                        {{ form.date_of_birth|add_class:"form-control" }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.phone_number.label_tag }}
+                        {{ form.phone_number|add_class:"form-control" }}
+                    </div>
+                </div>
+
+                <!-- Email & Parent Name -->
+                <div class="row g-3 mt-3">
+                    <div class="col-md-6">
+                        {{ form.email.label_tag }}
+                        {{ form.email|add_class:"form-control" }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.parent_name.label_tag }}
+                        {{ form.parent_name|add_class:"form-control" }}
+                    </div>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="d-flex flex-wrap gap-2 mt-4">
+
+                    <!-- Save Student -->
+                    <button type="submit" class="btn btn-success btn-lg">
+                        💾 Save Student
+                    </button>
+
+                    <!-- Save & Add Another -->
+                    <button type="submit" name="action" value="add_another" class="btn btn-success btn-lg">
+                        ➕ Save & Add Another
+                    </button>
+
+                    <!-- Cancel / View Students -->
+                    <a href="{% url 'view_students' %}" class="btn btn-secondary btn-lg">
+                        ❌ Cancel
+                    </a>
+
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
