@@ -1,12 +1,12 @@
-# Django
-*.log
-*.pot
-*.pyc
+# Python
 __pycache__/
+*.pyc
+
+# Django
 db.sqlite3
 media/
 
-# Virtual Environments
+# Virtual Env
 env/
 venv/
 .venv/
