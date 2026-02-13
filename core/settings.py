@@ -1,23 +1,23 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
-# Build paths inside the project
-BASE_DIR = Path(__file__).resolve().parent.parent
+# Build paths inside the project like this: os.path.join(BASE_DIR, 'subdir')
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
-# SECURITY WARNING: keep the secret key secret in production!
+# ------------------------------
+# Security
+# ------------------------------
 SECRET_KEY = 'django-insecure-1234567890abcdef1234567890abcdef'
-
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
-
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
-
-
-# Application definition
-
+TIME_ZONE = 'Africa/Nairobi'  # Change to your local timezone
+USE_TZ = True
+LOGIN_REDIRECT_URL = 'home'   # after login
+LOGOUT_REDIRECT_URL = 'login'      # after logout
+LOGIN_URL = 'login'
+# ------------------------------
+# Applications
+# ------------------------------
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -29,12 +29,12 @@ INSTALLED_APPS = [
     # Your apps
     'students_app',
     'fees',
-
-    # Third-party
     'widget_tweaks',
 ]
 
-
+# ------------------------------
+# Middleware
+# ------------------------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -45,20 +45,19 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-
 ROOT_URLCONF = 'core.urls'
 
-
+# ------------------------------
+# Templates
+# ------------------------------
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
 
-        'DIRS': [
-            BASE_DIR / 'students_app' / 'templates',
-        ],
+        # ✅ Project-level templates folder
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
 
         'APP_DIRS': True,
-
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -70,61 +69,28 @@ TEMPLATES = [
     },
 ]
 
-
-WSGI_APPLICATION = 'core.wsgi.application'
-
-
+# ------------------------------
 # Database
+# ------------------------------
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),  # Use os.path.join since BASE_DIR is a string
     }
 }
 
-
-# Password validation
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
-
-
-# Internationalization
-
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'Africa/Nairobi'
-
-USE_I18N = True
-
-USE_TZ = True
-
-
+# ------------------------------
 # Static files (CSS, JS, Images)
-
+# ------------------------------
 STATIC_URL = '/static/'
 
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-
-# Media files (Uploads / Receipts)
-
+# ------------------------------
+# Media files (uploads, receipts)
+# ------------------------------
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # This is where uploaded files will be stored
 
-
+# ------------------------------
 # Default primary key field type
-
+# ------------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

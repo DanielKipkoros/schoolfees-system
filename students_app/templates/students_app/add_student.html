@@ -15,11 +15,21 @@
         <!-- Card Body -->
         <div class="card-body p-4">
 
-            <!-- Back to Home Button at Top -->
+            <!-- Back to Home Button -->
             <div class="mb-3">
-                <a href="{% url 'home' %}" class="btn btn-primary btn-sm">
-                    ⬅ Back to Home
-                </a>
+                <a href="{% url 'home' %}" class="btn btn-primary btn-sm">⬅ Back to Home</a>
+            </div>
+
+            <!-- Last & Next Admission Numbers -->
+            <div class="mb-3">
+                <p class="mb-1">
+                    📌 Last Admission Number: 
+                    <strong>{{ last_admission_number|default:"None Yet" }}</strong>
+                </p>
+                <p class="mb-3">
+                    💡 Next Admission Number: 
+                    <strong>{{ next_admission_number }}</strong>
+                </p>
             </div>
 
             <!-- Flash Messages -->
@@ -76,6 +86,8 @@
                     </div>
                 </div>
 
+                
+
                 <!-- Date of Birth & Contact -->
                 <div class="row g-3 mt-3">
                     <div class="col-md-6">
@@ -102,22 +114,9 @@
 
                 <!-- Submit Buttons -->
                 <div class="d-flex flex-wrap gap-2 mt-4">
-
-                    <!-- Save Student -->
-                    <button type="submit" class="btn btn-success btn-lg">
-                        💾 Save Student
-                    </button>
-
-                    <!-- Save & Add Another -->
-                    <button type="submit" name="action" value="add_another" class="btn btn-success btn-lg">
-                        ➕ Save & Add Another
-                    </button>
-
-                    <!-- Cancel / View Students -->
-                    <a href="{% url 'view_students' %}" class="btn btn-secondary btn-lg">
-                        ❌ Cancel
-                    </a>
-
+                    <button type="submit" class="btn btn-success btn-lg">💾 Save Student</button>
+                    <button type="submit" name="action" value="add_another" class="btn btn-success btn-lg">➕ Save & Add Another</button>
+                    <a href="{% url 'view_students' %}" class="btn btn-secondary btn-lg">❌ Cancel</a>
                 </div>
 
             </form>

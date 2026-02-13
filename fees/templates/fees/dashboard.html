@@ -1,0 +1,62 @@
+{% extends "students_app/base.html" %}
+{% load static %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<style>
+body { background-color: #fff8f0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+.dashboard-header { text-align: center; margin: 40px 0 20px 0; opacity: 0; transform: translateY(-20px); animation: fadeInDown 1s forwards; }
+.dashboard-header img { max-width: 250px; margin-bottom: 15px; }
+.dashboard-header h1 { font-weight: 700; color: #333; font-size: 2.5rem; }
+@keyframes fadeInDown { to { opacity: 1; transform: translateY(0); } }
+.stats-grid { display: flex; justify-content: center; flex-wrap: wrap; gap: 30px; opacity: 0; animation: fadeInUp 1s forwards 0.5s; }
+@keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+.stat-circle { background: #fff; border-radius: 50%; width: 200px; height: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 8px 20px rgba(0,0,0,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease; position: relative; cursor: pointer; }
+.stat-circle:hover { transform: scale(1.1); box-shadow: 0 12px 30px rgba(0,0,0,0.2); }
+.stat-circle h2 { font-size: 2rem; margin: 10px 0 0 0; color: #4e79a7; }
+.stat-circle p { font-size: 1.1rem; margin: 0; color: #555; font-weight: 500; }
+.tooltip { position: absolute; bottom: -50px; background: rgba(0,0,0,0.75); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; white-space: nowrap; opacity: 0; transition: opacity 0.3s ease, bottom 0.3s ease; pointer-events: none; }
+.stat-circle:hover .tooltip { opacity: 1; bottom: -60px; }
+.footer-note { text-align: center; color: #999; font-size: 0.9rem; margin-top: 50px; opacity: 0; animation: fadeIn 1s forwards 1s; }
+@keyframes fadeIn { to { opacity: 1; } }
+</style>
+
+<div class="dashboard-header">
+    <img src="{% static 'students_app/images/pass.png' %}" alt="Anaku Logo" width="400" class="img-fluid mb-3">
+    <h1>{{ school_name }}</h1>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-circle">
+        <p>Total Students</p>
+        <h2 class="count" data-target="{{ total_students }}">{{ total_students }}</h2>
+        <div class="tooltip">All enrolled students</div>
+    </div>
+
+    <div class="stat-circle">
+        <p>Fees Collected</p>
+        <h2 class="count" data-target="{{ total_fees_collected|floatformat:0 }}">{{ total_fees_collected|floatformat:0 }}</h2>
+        <div class="tooltip">Total fees collected this year</div>
+    </div>
+
+  
+
+<script>
+const counters = document.querySelectorAll('.count');
+counters.forEach(counter => {
+    const updateCount = () => {
+        const target = +counter.getAttribute('data-target');
+        const count = +counter.innerText.replace(/,/g, '');
+        const increment = target / 100;
+        if(count < target) {
+            counter.innerText = Math.ceil(count + increment).toLocaleString();
+            setTimeout(updateCount, 20);
+        } else {
+            counter.innerText = target.toLocaleString();
+        }
+    };
+    updateCount();
+});
+</script>
+{% endblock %}

@@ -8,9 +8,27 @@
 </head>
 <body class="bg-light">
 
+<!-- Navbar with Logout -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#">ST JOSEPH PREPARATORY SCHOOL</a>
+
+        <div class="d-flex align-items-center">
+            <span class="me-3">Hello, {{ request.user.username }}</span>
+
+            <!-- Logout Form -->
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger">Logout</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<!-- Header -->
 <div class="text-center my-4">
     <!-- School logo -->
-    <img src="{% static 'students_app/images/pass.png' %}" alt="Anaku Logo" width="400" class="img-fluid mb-3">
+    <img src="{% static 'students_app/images/pass.png' %}" alt="School Logo" width="400" class="img-fluid mb-3">
     <h1 class="mb-4">
         ST JOSEPH PREPARATORY SCHOOL FEES MANAGEMENT SYSTEM
     </h1>
@@ -46,7 +64,18 @@
                 📊 Reports
             </a>
         </div>
+        
+       
 
+        <!-- Activity Logs Button (Staff Only) -->
+        {% if request.user.is_staff %}
+        <div class="col-md-3">
+            <a href="{% url 'activity_logs' %}" class="btn btn-dark w-100 p-3">
+                📜 Activity Logs
+            </a>
+        </div>
+        {% endif %}
+        
     </div>
 </div>
 

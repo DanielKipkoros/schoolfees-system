@@ -25,7 +25,7 @@ class StudentForm(forms.ModelForm):
             'gender',
             'is_boarder',
             'date_of_birth',
-            'admission_year',  # Include the field here
+            'admission_year',
             'phone_number',
             'email',
             'parent_name',

@@ -1,232 +1,115 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>Add Fee</title>
-
-    <!-- Bootstrap CSS -->
+    <title>Add Fee Payment</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
     <style>
-        /* Autocomplete dropdown */
-        #suggestions {
-            position: absolute;
-            width: 100%;
-            z-index: 1000;
-            background: white;
-            border: 1px solid #ddd;
-            border-top: none;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        #suggestions a:hover {
-            background-color: #f1f1f1;
-        }
+        #suggestions { position: absolute; width: 100%; z-index: 1000; background: white; border: 1px solid #ddd; border-top: none; max-height: 200px; overflow-y: auto; }
+        #suggestions a:hover { background-color: #f1f1f1; }
     </style>
 </head>
-
 <body class="bg-light">
-
-<div class="container mt-3">
-    <a href="{% url 'home' %}" class="btn btn-outline-secondary">⬅ Back to Home</a>
-</div>
-
+<div class="container mt-3"><a href="{% url 'home' %}" class="btn btn-outline-secondary">⬅ Back to Home</a></div>
 <div class="container mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-7 col-lg-6">
+        <div class="col-md-8 col-lg-7">
             <div class="card shadow-lg border-0 rounded-4">
-
-                <!-- Header -->
-                <div class="card-header bg-primary text-white text-center rounded-top-4">
-                    <h4 class="mb-0">💰 Add Fee Payment</h4>
-                </div>
-
+                <div class="card-header bg-primary text-white text-center rounded-top-4"><h4 class="mb-0">💰 Add Fee Payment</h4></div>
                 <div class="card-body p-4">
-
-                    <!-- Messages -->
                     {% if messages %}
                         {% for message in messages %}
-                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
-                                {{ message }}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">{{ message }}
                                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                             </div>
                         {% endfor %}
                     {% endif %}
 
-                    <!-- Form -->
-                    <form method="POST" id="fee-form" enctype="multipart/form-data">
+                    <form method="POST" id="fee-form">
                         {% csrf_token %}
-
-                        <!-- Admission Number -->
                         <div class="mb-3 position-relative">
                             <label class="form-label fw-semibold">Admission Number</label>
-                            <input type="text" name="admission_number" id="admission-input"
-                                   class="form-control"
-                                   autocomplete="off"
-                                   placeholder="Enter admission number"
-                                   required>
+                            {{ form.admission_number }}
                             <div id="suggestions" class="list-group"></div>
                         </div>
 
-                        <!-- Student Info -->
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Student Name</label>
-                                <input type="text"
-                                       id="student-name"
-                                       class="form-control bg-light"
-                                       readonly>
+                                <input type="text" id="student-name" class="form-control bg-light" readonly>
                             </div>
-
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Grade</label>
-                                <input type="text"
-                                       id="student-grade"
-                                       class="form-control bg-light"
-                                       readonly>
+                                <input type="text" id="student-grade" class="form-control bg-light" readonly>
                             </div>
                         </div>
 
                         <hr class="my-4">
+                        <div class="mb-3"><label class="form-label fw-semibold">School Term</label>{{ form.term }}</div>
+                        
+                        <div class="mb-3"><label class="form-label fw-semibold">Payment Date</label>{{ form.payment_date }}</div>
+                        <div class="mb-3"><label class="form-label fw-semibold">Amount Paid (KES)</label>{{ form.amount_paid }}</div>
+                        <div class="mb-3"><label class="form-label fw-semibold">Payment Method</label>{{ form.payment_method }}</div>
+                        <div class="mb-3" id="mpesa-code-container" style="display:none;"><label class="form-label fw-semibold">MPESA Code</label>{{ form.mpesa_code }}</div>
+                        <div class="mb-3"><label class="form-label fw-semibold">Old Fee Arrears (KES)</label>{{ form.old_arrears }}</div>
 
-                        <!-- Term -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">School Term</label>
-                            {{ form.term }}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-between mt-4">
+                            <button type="submit" name="action" value="save" class="btn btn-primary px-4">💾 Save</button>
+                            <button type="submit" name="action" value="add_another" class="btn btn-success px-4">➕ Save & Add Another</button>
                         </div>
-
-                        <!-- Payment Year -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Payment Year</label>
-                            {{ form.payment_year }}
-                        </div>
-
-                        <!-- Amount Paid -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Amount Paid (KES)</label>
-                            {{ form.amount_paid }}
-                        </div>
-
-                        <!-- Payment Method -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Payment Method</label>
-                            {{ form.payment_method }}
-                        </div>
-
-                        <!-- MPESA Code -->
-                        <div class="mb-3" id="mpesa-code-container" style="display: none;">
-                            <label class="form-label fw-semibold">MPESA Code</label>
-                            {{ form.mpesa_code }}
-                        </div>
-
-                        <!-- Receipt Upload -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Receipt (optional)</label>
-                            {{ form.receipt }}
-                        </div>
-
-                        <!-- Submit Buttons -->
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-between mt-3">
-
-                            <!-- Normal Save -->
-                            <button type="submit" name="action" value="save"
-                                    class="btn btn-primary px-4">
-                                💾 Save
-                            </button>
-
-                            <!-- Save and Add Another -->
-                            <button type="submit" name="action" value="add_another"
-                                    class="btn btn-success px-4">
-                                ➕ Save & Add Another
-                           
-                            </button>
-
-                        </div>
-
                     </form>
 
+                    {% if form.errors %}
+                        <div class="alert alert-danger mt-3">
+                            <ul>
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- JavaScript -->
 <script>
-    const input = document.getElementById("admission-input");
-    const suggestions = document.getElementById("suggestions");
-    const nameField = document.getElementById("student-name");
-    const gradeField = document.getElementById("student-grade");
-    const paymentMethod = document.getElementById("id_payment_method"); // Django form field
-    const mpesaContainer = document.getElementById("mpesa-code-container");
-    const form = document.getElementById("fee-form");
+const input = document.getElementById("id_admission_number");
+const suggestions = document.getElementById("suggestions");
+const nameField = document.getElementById("student-name");
+const gradeField = document.getElementById("student-grade");
+const mpesa = document.getElementById("id_payment_method");
+const mpesaContainer = document.getElementById("mpesa-code-container");
 
-    // Autocomplete
-    input.addEventListener("keyup", function () {
-        const query = this.value;
-        if (query.length < 2) {
+input.addEventListener("keyup", function () {
+    const query = this.value;
+    if (query.length < 2) { suggestions.innerHTML = ""; return; }
+    fetch(`/fees/search-students/?q=${query}`)
+        .then(res => res.json())
+        .then(data => {
             suggestions.innerHTML = "";
-            nameField.value = "";
-            gradeField.value = "";
-            return;
-        }
-        fetch(`/fees/search-students/?q=${query}`)
-            .then(response => response.json())
-            .then(data => {
-                suggestions.innerHTML = "";
-                data.forEach(student => {
-                    const item = document.createElement("a");
-                    item.classList.add("list-group-item", "list-group-item-action");
-                    item.textContent = student.admission + " - " + student.name;
-                    item.onclick = function () {
-                        input.value = student.admission;
-                        suggestions.innerHTML = "";
-                        fetch(`/fees/get-student-info/?admission_number=${student.admission}`)
-                            .then(resp => resp.json())
-                            .then(info => {
-                                if (!info.error) {
-                                    nameField.value = info.name;
-                                    gradeField.value = info.grade;
-                                } else {
-                                    nameField.value = "";
-                                    gradeField.value = "";
-                                }
-                            });
-                    };
-                    suggestions.appendChild(item);
-                });
+            data.forEach(s => {
+                const item = document.createElement("a");
+                item.className = "list-group-item list-group-item-action";
+                item.textContent = `${s.admission} - ${s.name}`;
+                item.onclick = () => { input.value = s.admission; nameField.value = s.name; gradeField.value = s.grade; suggestions.innerHTML = ""; };
+                suggestions.appendChild(item);
             });
-    });
+        });
+});
 
-    // Hide suggestions on click outside
-    document.addEventListener("click", function (e) {
-        if (!input.contains(e.target)) suggestions.innerHTML = "";
-    });
-
-    // MPESA toggle
-    paymentMethod.addEventListener("change", function () {
-        if (this.value === "Mpesa") {
-            mpesaContainer.style.display = "block";
-        } else {
-            mpesaContainer.style.display = "none";
-        }
-    });
-
-    // Form validation
-    form.addEventListener("submit", function (e) {
-        if (nameField.value.trim() === "") {
-            e.preventDefault();
-            alert("Please select a valid student from the list.");
-            input.focus();
-        }
-    });
+mpesa.addEventListener("change", function() {
+    mpesaContainer.style.display = this.value === "Mpesa" ? "block" : "none";
+});
 </script>
 
-<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
 </body>
 </html>
