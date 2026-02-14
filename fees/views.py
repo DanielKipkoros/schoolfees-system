@@ -27,6 +27,8 @@ from .models import Fee, Term, ActivityLog
 from .forms import FeeForm
 from students_app.models import Student, UsedAdmissionNumber
 from students_app.forms import StudentForm
+from fees.models import Term
+
 
 
 
@@ -57,53 +59,48 @@ CURRENT_YEAR_FEES = {
 BOARDING_FEE = 8000  # Additional fee for boarders
 
 @login_required
-def add_student(request):
-    # -------------------------
-    # Get last used admission number
-    # -------------------------
-    last_used = UsedAdmissionNumber.objects.order_by('-id').first()
-    last_admission_number = last_used.admission_number if last_used else "None Yet"
-
+def add_fee(request):
     if request.method == "POST":
-        form = StudentForm(request.POST)
+        form = FeeForm(request.POST)
+
         if form.is_valid():
-            admission_number = form.cleaned_data['admission_number']
+            # Save the fee (Student is automatically attached in FeeForm.save())
+            fee = form.save()
 
-            # Check if this admission number was already used
-            if UsedAdmissionNumber.objects.filter(admission_number=admission_number).exists():
-                messages.error(request, f"❌ Admission Number {admission_number} has already been used.")
+            # Log the payment creation
+            ActivityLog.objects.create(
+                user=request.user,
+                action='PAYMENT_CREATE',
+                description=f"Payment added for {fee.student.name} (Adm: {fee.student.admission_number}) - Term: {fee.term.name} - Amount: {fee.amount_paid}"
+            )
+
+            messages.success(request, f"✅ Payment recorded for {fee.student.name}")
+
+            # Handle "Save & Add Another"
+            action = request.POST.get('action')
+            if action == 'add_another':
+                form = FeeForm()  # Reset form
             else:
-                # Save student
-                student = form.save()
+                return redirect('add_fee')  # Or redirect wherever you want
 
-                # Log student creation
-                ActivityLog.objects.create(
-                    user=request.user,
-                    action='STUDENT_CREATE',
-                    description=f"Added student {student.name} (Adm: {student.admission_number})"
-                )
-
-                # Save admission number to UsedAdmissionNumber
-                UsedAdmissionNumber.objects.create(admission_number=admission_number)
-
-                messages.success(request, f"✅ Student recorded: {student.name}")
-
-                # Reset form if "Add Another" is clicked
-                action = request.POST.get('action')
-                if action == 'add_another':
-                    form = StudentForm()
-                else:
-                    return redirect('view_students')
         else:
+            # 🔹 Debug: Print POST data and form errors for diagnosis
+            print("========== FORM SUBMISSION ERROR ==========")
+            print("POST DATA:", request.POST)
+            print("FORM ERRORS:", form.errors.as_json())  # JSON output of all errors
+            print("==========================================")
+            
+            # Show generic error message to user
             messages.error(request, "❌ Please correct the errors below.")
+
     else:
-        form = StudentForm()
+        form = FeeForm()
 
     context = {
-        "form": form,
-        "last_admission_number": last_admission_number,  # Pass to template
+        'form': form,
     }
-    return render(request, "students_app/add_student.html", context)
+
+    return render(request, 'fees/add_fee.html', context)
 # ----------------------------------
 # List Fees with Generated column
 # ----------------------------------
@@ -216,16 +213,21 @@ def get_student_info(request):
 # ----------------------------------
 @login_required
 def search_students(request):
-    q = request.GET.get("q", "")
-    students = Student.objects.filter(admission_number__icontains=q)[:10]
+    query = request.GET.get("q", "").strip()
+    if not query:
+        return JsonResponse([], safe=False)
+
+    students = Student.objects.filter(admission_number__icontains=query)[:10]
+
     results = []
     for s in students:
         results.append({
             "id": s.id,
             "admission": s.admission_number,
             "name": s.name,
-            "grade": s.student_grade
+            "grade": s.student_grade  # Matches your model field
         })
+
     return JsonResponse(results, safe=False)
 
 # -------------------------------
@@ -523,3 +525,4 @@ def add_fee(request):
         form = FeeForm()
 
     return render(request, 'fees/add_fee.html', {'form': form})
+    print(form.errors)

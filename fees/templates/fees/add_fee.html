@@ -6,21 +6,43 @@
     <title>Add Fee Payment</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        #suggestions { position: absolute; width: 100%; z-index: 1000; background: white; border: 1px solid #ddd; border-top: none; max-height: 200px; overflow-y: auto; }
-        #suggestions a:hover { background-color: #f1f1f1; }
+        #suggestions {
+            position: absolute;
+            width: 100%;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        #suggestions a:hover {
+            background-color: #f1f1f1;
+        }
     </style>
 </head>
+
 <body class="bg-light">
-<div class="container mt-3"><a href="{% url 'home' %}" class="btn btn-outline-secondary">⬅ Back to Home</a></div>
+
+<div class="container mt-3">
+    <a href="{% url 'home' %}" class="btn btn-outline-secondary">⬅ Back to Home</a>
+</div>
+
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-7">
             <div class="card shadow-lg border-0 rounded-4">
-                <div class="card-header bg-primary text-white text-center rounded-top-4"><h4 class="mb-0">💰 Add Fee Payment</h4></div>
+
+                <div class="card-header bg-primary text-white text-center rounded-top-4">
+                    <h4 class="mb-0">💰 Add Fee Payment</h4>
+                </div>
+
                 <div class="card-body p-4">
+
                     {% if messages %}
                         {% for message in messages %}
-                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">{{ message }}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                                {{ message }}
                                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                             </div>
                         {% endfor %}
@@ -28,12 +50,18 @@
 
                     <form method="POST" id="fee-form">
                         {% csrf_token %}
+
+                        <!-- Admission Number -->
                         <div class="mb-3 position-relative">
                             <label class="form-label fw-semibold">Admission Number</label>
                             {{ form.admission_number }}
+                            {% if form.admission_number.errors %}
+                                <div class="text-danger small">{{ form.admission_number.errors }}</div>
+                            {% endif %}
                             <div id="suggestions" class="list-group"></div>
                         </div>
 
+                        <!-- Student Preview -->
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Student Name</label>
@@ -46,51 +74,102 @@
                         </div>
 
                         <hr class="my-4">
-                        <div class="mb-3"><label class="form-label fw-semibold">School Term</label>{{ form.term }}</div>
-                        
-                        <div class="mb-3"><label class="form-label fw-semibold">Payment Date</label>{{ form.payment_date }}</div>
-                        <div class="mb-3"><label class="form-label fw-semibold">Amount Paid (KES)</label>{{ form.amount_paid }}</div>
-                        <div class="mb-3"><label class="form-label fw-semibold">Payment Method</label>{{ form.payment_method }}</div>
-                        <div class="mb-3" id="mpesa-code-container" style="display:none;"><label class="form-label fw-semibold">MPESA Code</label>{{ form.mpesa_code }}</div>
-                        <div class="mb-3"><label class="form-label fw-semibold">Old Fee Arrears (KES)</label>{{ form.old_arrears }}</div>
+
+                        <!-- Term -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">School Term</label>
+                            {{ form.term }}
+                            {% if form.term.errors %}
+                                <div class="text-danger small">{{ form.term.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Payment Date -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Payment Date</label>
+                            {{ form.payment_date }}
+                            {% if form.payment_date.errors %}
+                                <div class="text-danger small">{{ form.payment_date.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Amount -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Amount Paid (KES)</label>
+                            {{ form.amount_paid }}
+                            {% if form.amount_paid.errors %}
+                                <div class="text-danger small">{{ form.amount_paid.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Payment Method -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Payment Method</label>
+                            {{ form.payment_method }}
+                            {% if form.payment_method.errors %}
+                                <div class="text-danger small">{{ form.payment_method.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- MPESA Code -->
+                        <div class="mb-3" id="mpesa-code-container" style="display:none;">
+                            <label class="form-label fw-semibold">MPESA Code</label>
+                            {{ form.mpesa_code }}
+                            {% if form.mpesa_code.errors %}
+                                <div class="text-danger small">{{ form.mpesa_code.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Old Arrears -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Old Fee Arrears (KES)</label>
+                            {{ form.old_arrears }}
+                            {% if form.old_arrears.errors %}
+                                <div class="text-danger small">{{ form.old_arrears.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Non Field Errors -->
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-between mt-4">
                             <button type="submit" name="action" value="save" class="btn btn-primary px-4">💾 Save</button>
                             <button type="submit" name="action" value="add_another" class="btn btn-success px-4">➕ Save & Add Another</button>
                         </div>
-                    </form>
 
-                    {% if form.errors %}
-                        <div class="alert alert-danger mt-3">
-                            <ul>
-                            {% for field in form %}
-                                {% for error in field.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            {% endfor %}
-                            {% for error in form.non_field_errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- JavaScript -->
 <script>
-const input = document.getElementById("id_admission_number");
+const admissionInput = document.getElementById("id_admission_number");
 const suggestions = document.getElementById("suggestions");
 const nameField = document.getElementById("student-name");
 const gradeField = document.getElementById("student-grade");
-const mpesa = document.getElementById("id_payment_method");
+const paymentMethod = document.getElementById("id_payment_method");
 const mpesaContainer = document.getElementById("mpesa-code-container");
 
-input.addEventListener("keyup", function () {
-    const query = this.value;
-    if (query.length < 2) { suggestions.innerHTML = ""; return; }
+// ------------------------------
+// Autocomplete Student Search
+// ------------------------------
+let selectedStudent = null; // ⚡ Keep track of selected student
+
+admissionInput.addEventListener("keyup", function () {
+    const query = this.value.trim();
+    if (query.length < 2) {
+        suggestions.innerHTML = "";
+        selectedStudent = null;
+        nameField.value = "";
+        gradeField.value = "";
+        return;
+    }
+
     fetch(`/fees/search-students/?q=${query}`)
         .then(res => res.json())
         .then(data => {
@@ -99,15 +178,46 @@ input.addEventListener("keyup", function () {
                 const item = document.createElement("a");
                 item.className = "list-group-item list-group-item-action";
                 item.textContent = `${s.admission} - ${s.name}`;
-                item.onclick = () => { input.value = s.admission; nameField.value = s.name; gradeField.value = s.grade; suggestions.innerHTML = ""; };
+                item.href = "#";
+                item.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    admissionInput.value = s.admission;
+                    nameField.value = s.name;
+                    gradeField.value = s.grade;
+                    selectedStudent = s.admission; // ⚡ mark valid student
+                    suggestions.innerHTML = "";
+                });
                 suggestions.appendChild(item);
             });
         });
 });
 
-mpesa.addEventListener("change", function() {
-    mpesaContainer.style.display = this.value === "Mpesa" ? "block" : "none";
+// ------------------------------
+// Prevent form submit if invalid admission
+// ------------------------------
+document.getElementById("fee-form").addEventListener("submit", function (e) {
+    if (!selectedStudent || admissionInput.value.trim() !== selectedStudent) {
+        e.preventDefault();
+        alert("❌ Please select a valid admission number from the list!");
+        admissionInput.focus();
+    }
 });
+
+// ------------------------------
+// Show/Hide MPESA code
+// ------------------------------
+function toggleMpesa() {
+    if (!paymentMethod) return;
+    if (paymentMethod.value.toLowerCase() === "mpesa") {
+        mpesaContainer.style.display = "block";
+    } else {
+        mpesaContainer.style.display = "none";
+    }
+}
+if (paymentMethod) {
+    paymentMethod.addEventListener("change", toggleMpesa);
+    toggleMpesa(); // Run on page load
+}
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

@@ -15,11 +15,7 @@ class Term(models.Model):
 
 
 class Fee(models.Model):
-    TERM_CHOICES = [
-        ("Term 1", "Term 1"),
-        ("Term 2", "Term 2"),
-        ("Term 3", "Term 3"),
-    ]
+ 
     PAYMENT_CHOICES = [
         ("Cash", "Cash"),
         ("Bank", "Bank"),
