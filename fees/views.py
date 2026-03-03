@@ -1,8 +1,6 @@
 import re
 import os
-import json
-from datetime import datetime, date
-from decimal import Decimal
+from datetime import datetime
 from collections import OrderedDict
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -11,7 +9,7 @@ from django.http import JsonResponse, HttpResponse
 from django.template.loader import render_to_string
 from django.templatetags.static import static
 from django.conf import settings
-from django.db.models import Sum, Q, F, DecimalField, Count
+from django.db.models import Sum, Q, DecimalField
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.core.files import File
@@ -23,175 +21,291 @@ from django.dispatch import receiver
 from xhtml2pdf import pisa
 from num2words import num2words
 
-from .models import Fee, Term, ActivityLog
-from .forms import FeeForm
-from students_app.models import Student, UsedAdmissionNumber
+# Import models
+from students_app.models import Student, UsedAdmissionNumber, Term
+from fees.models import Fee, ActivityLog
+# Import forms
 from students_app.forms import StudentForm
-from fees.models import Term
+from fees.forms import FeeForm
+from decimal import Decimal
+from django.urls import reverse
+import tempfile
+from weasyprint import HTML
+from django.db.models import Max, Sum
+from io import BytesIO
+from django.core.files.base import ContentFile
+from django.db import transaction
+from django.db.models import OuterRef, Subquery
+from django.db.models import F
+from .models import Fee, FeeStructure
+
+import base64
+from django.templatetags.static import static
+from django.contrib.staticfiles import finders
+from fees.models import AcademicYear
+from .models import FeeAdjustment
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
+logo_path = finders.find('students_app/images/pass.png')
+with open(logo_path, 'rb') as f:
+    logo_data = f.read()
+logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+logo_data_url = f'data:image/png;base64,{logo_base64}'
 
 
 
 
 
 
-
-
-
-
-# -------------------------
-# Current year fee structure
-# -------------------------
-CURRENT_YEAR_FEES = {
-    'Baby Class': {'Term 1':11700, 'Term 2': 11700, 'Term 3': 11100},
-    'PP1': {'Term 1':11700, 'Term 2': 11700, 'Term 3': 11100},
-    'PP2': {'Term 1':11700, 'Term 2': 11700, 'Term 3': 11100},
-    'Grade 1': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-    'Grade 2': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-    'Grade 3': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-    'Grade 4': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-    'Grade 5': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-    'Grade 6': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-    'Grade 7': {'Term 1': 13900, 'Term 2': 13900, 'Term 3': 13500},
-    'Grade 8': {'Term 1': 13900, 'Term 2': 13900, 'Term 3': 13500},
-    'Grade 9': {'Term 1': 13900, 'Term 2': 13900, 'Term 3': 13500},
-}
-
-BOARDING_FEE = 8000  # Additional fee for boarders
-
-@login_required
+@login_required 
 def add_fee(request):
+    """
+    Add a fee payment for a student.
+    - Automatically bills the student based on the term, grade & year using FeeStructure.
+    - Saves the actual amount paid entered in the form.
+    - Handles boarders and old arrears.
+    - Generates a unique receipt number immediately.
+    """
     if request.method == "POST":
-        form = FeeForm(request.POST)
+        form = FeeForm(request.POST, request.FILES)
 
         if form.is_valid():
-            # Save the fee (Student is automatically attached in FeeForm.save())
-            fee = form.save()
+            fee = form.save(commit=False)
 
-            # Log the payment creation
-            ActivityLog.objects.create(
-                user=request.user,
-                action='PAYMENT_CREATE',
-                description=f"Payment added for {fee.student.name} (Adm: {fee.student.admission_number}) - Term: {fee.term.name} - Amount: {fee.amount_paid}"
+            # Ensure payment year is set
+            if not fee.payment_year:
+                fee.payment_year = datetime.now().year
+
+            student = fee.student
+            term = fee.term
+            grade = student.student_grade
+            payment_year = fee.payment_year
+
+            # -----------------------------
+            # Get fee structure dynamically
+            # -----------------------------
+            academic_year_obj = AcademicYear.objects.filter(
+             name=str(payment_year)
+            ).first()
+
+            structure = FeeStructure.objects.filter(
+             grade=grade,
+             term=term.name,
+             academic_year=academic_year_obj
+            ).first()            
+
+            if structure:
+                term_fee = Decimal(structure.amount)
+                if getattr(student, "is_boarder", "No") == "Yes":
+                    term_fee += Decimal(structure.boarding_amount)
+            else:
+                term_fee = Decimal('0.00')
+                messages.warning(
+                    request,
+                    f"⚠ Fee structure not found for {grade}, {term.name}, {payment_year}. Defaulting amount due to Ksh {term_fee}."
+                )
+
+            fee.amount_due = term_fee  # Store full due amount for this term
+
+            # Use the amount_paid entered in the form
+            fee.amount_paid = Decimal(fee.amount_paid or '0.00')
+
+            # Save the fee first
+            fee.save()
+
+            # -----------------------------
+            # 🔥 Generate new receipt number immediately
+            # -----------------------------
+            if not fee.receipt_number:
+                last_number = Fee.objects.aggregate(max_no=Max('receipt_number'))['max_no']
+                fee.receipt_number = (last_number + 1) if last_number else 1001
+                fee.save(update_fields=['receipt_number'])
+
+            messages.success(
+                request,
+                f"✅ Payment recorded for {student.name}. "
+                f"Amount Paid: Ksh {fee.amount_paid}. "
+                f"Amount Due: Ksh {term_fee}. Receipt Number: {fee.receipt_number}"
             )
 
-            messages.success(request, f"✅ Payment recorded for {fee.student.name}")
+            # Redirect to add another fee if needed
+            if request.POST.get('action') == 'add_another':
+                return redirect('add_fee')
 
-            # Handle "Save & Add Another"
-            action = request.POST.get('action')
-            if action == 'add_another':
-                form = FeeForm()  # Reset form
-            else:
-                return redirect('add_fee')  # Or redirect wherever you want
+            # Redirect to list_fees filtered for this student
+            return redirect(
+                f"{reverse('list_fees')}?search={student.name}&grade={grade}&year={payment_year}&term={term.id}"
+            )
 
         else:
-            # 🔹 Debug: Print POST data and form errors for diagnosis
-            print("========== FORM SUBMISSION ERROR ==========")
-            print("POST DATA:", request.POST)
-            print("FORM ERRORS:", form.errors.as_json())  # JSON output of all errors
-            print("==========================================")
-            
-            # Show generic error message to user
+            print(form.errors)
             messages.error(request, "❌ Please correct the errors below.")
 
     else:
         form = FeeForm()
 
-    context = {
-        'form': form,
-    }
+    return render(request, 'fees/add_fee.html', {'form': form})
 
-    return render(request, 'fees/add_fee.html', context)
-# ----------------------------------
-# List Fees with Generated column
-# ----------------------------------
+
+
 @login_required
 def list_fees(request):
     search_query = request.GET.get('search', '').strip()
     grade_filter = request.GET.get('grade', '').strip()
     year_filter = request.GET.get('year', '').strip()
-    term = request.GET.get('term', '').strip()
+    term_raw = request.GET.get('term', '').strip()
 
-    fees = Fee.objects.select_related('student', 'term').all().order_by('-id')
+    try:
+        term_filter = int(term_raw)
+    except (ValueError, TypeError):
+        term_filter = None
+
+    fees_qs = Fee.objects.select_related('student', 'term')
+
+    if term_filter:
+        fees_qs = fees_qs.filter(term_id=term_filter)
+
+    if grade_filter:
+        fees_qs = fees_qs.filter(student__student_grade=grade_filter)
+
+    if year_filter:
+        fees_qs = fees_qs.filter(payment_year=year_filter)
 
     if search_query:
-        fees = fees.filter(
+        fees_qs = fees_qs.filter(
             Q(student__name__icontains=search_query) |
             Q(student__admission_number__icontains=search_query)
         )
 
-    if grade_filter:
-        fees = fees.filter(student__student_grade=grade_filter)
-
-    if year_filter:
-        fees = fees.filter(payment_year=year_filter)
-
-    if term:
-        fees = fees.filter(term_id=term)  # properly indented
-
-    # -----------------------------
-    # Compute dynamic balances
-    # -----------------------------
     fee_list = []
-    for fee in fees:
-        term_fee = CURRENT_YEAR_FEES.get(fee.student.student_grade, {}).get(fee.term.name, 0)
-        if getattr(fee.student, 'is_boarder', 'No') == "Yes":
-            term_fee += BOARDING_FEE
 
-        paid_so_far = Fee.objects.filter(
-            student=fee.student,
-            payment_year=fee.payment_year,
-            term=fee.term
-        ).aggregate(total_paid=Sum('amount_paid'))['total_paid'] or 0
+    # ⭐ Safe model loading for attendance adjustment
+    from django.apps import apps
+    FeeAdjustmentModel = apps.get_model('fees', 'FeeAdjustment')
 
-        fee.dynamic_balance = float(fee.old_arrears or 0) + float(term_fee) - float(paid_so_far)
-        fee.receipt_generated = bool(fee.receipt)
+    for fee in fees_qs:
 
-        fee_list.append(fee)
+        student = fee.student
 
-    # -----------------------------
-    # Students with outstanding balances (current term only)
-    # -----------------------------
-    CURRENT_TERM = "Term 1"
-    student_balances = OrderedDict()
-    for fee in fee_list:
-        if fee.term.name != CURRENT_TERM:
-            continue
-        if fee.dynamic_balance > 0:
-            if search_query and search_query.lower() not in fee.student.name.lower() and search_query not in fee.student.admission_number:
-                continue
-            if grade_filter and fee.student.student_grade != grade_filter:
-                continue
-            if year_filter and str(fee.payment_year) != str(year_filter):
-                continue
+        # ⭐ ALUMNI LOGIC
+        if student.is_alumni:
 
-            student_id = fee.student.id
-            if student_id not in student_balances or fee.id > student_balances[student_id].id:
-                student_balances[student_id] = fee
+            total_paid = Fee.objects.filter(
+                student=student
+            ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
 
-    fees_with_balance = list(student_balances.values())
-    years = Fee.objects.order_by('payment_year').values_list('payment_year', flat=True).distinct()
+            total_arrears = Fee.objects.filter(
+                student=student
+            ).aggregate(total=Sum('old_arrears'))['total'] or Decimal('0')
 
-    # -----------------------------
-    # ADD THIS: Get all terms for the dropdown
-    # -----------------------------
-    terms = Term.objects.all().order_by('name')
+            dynamic_balance = total_arrears - total_paid
 
-    context = {
+            fee_list.append({
+                'admission_number': student.admission_number,
+                'name': student.name,
+                'grade': "ALUMNI",
+                'term_name': "ALUMNI",
+                'payment_year': fee.payment_year,
+                'total_paid': total_paid,
+                'old_arrears': total_arrears,
+                'dynamic_balance': dynamic_balance,
+                'is_alumni': True,
+                'fee_id': fee.id,
+                'has_receipt': bool(fee.receipt),
+            })
+
+        # ⭐ NORMAL STUDENTS
+        else:
+
+            grade = student.student_grade
+            term_name = fee.term.name if fee.term else "N/A"
+            year = fee.payment_year
+
+            structure = FeeStructure.objects.filter(
+                grade=grade,
+                term=term_name,
+                academic_year__name=str(year)
+            ).first()
+
+            if structure:
+                term_fee = Decimal(structure.amount)
+
+                if student.is_boarder == "Yes":
+                    term_fee += Decimal(structure.boarding_amount)
+
+            else:
+                term_fee = Decimal("0.00")
+
+            total_paid = Decimal(fee.amount_paid or 0)
+            old_arrears = Decimal(fee.old_arrears or 0)
+
+            # ⭐ Attendance / Clearance Deduction Logic
+            deduction = Decimal("0.00")
+
+            adj = FeeAdjustmentModel.objects.filter(
+                student=student,
+                term=fee.term,
+                academic_year=fee.payment_year
+            ).first()
+
+            if adj:
+                if adj.status == "ABSENT":
+                    deduction = term_fee + old_arrears   # Remove full billing
+                elif adj.status == "CLEARED":
+                    deduction = Decimal("0.00")
+                else:
+                    deduction = Decimal(adj.deduction_amount or 0)
+
+            balance = max(
+                Decimal("0.00"),
+                (term_fee + old_arrears) - total_paid - deduction
+            )
+
+            fee_list.append({
+                'admission_number': student.admission_number,
+                'name': student.name,
+                'grade': grade,
+                'term_name': term_name,
+                'payment_year': year,
+                'total_paid': total_paid,
+                'old_arrears': old_arrears,
+                'dynamic_balance': balance,
+                'is_alumni': False,
+                'fee_id': fee.id,
+                'has_receipt': bool(fee.receipt),
+            })
+
+    outstanding = [f for f in fee_list if f['dynamic_balance'] > 0]
+
+    years = Fee.objects.values_list('payment_year', flat=True).distinct()
+    terms = Term.objects.all().order_by('start_date')
+    grades = list(
+        FeeStructure.objects.values_list('grade', flat=True)
+        .distinct()
+        .order_by('grade')
+    )
+
+    today = timezone.localdate()
+
+    current_term = Term.objects.filter(
+        start_date__lte=today,
+        end_date__gte=today
+    ).first()
+
+    return render(request, 'fees/list_fees.html', {
         'fees': fee_list,
-        'fees_with_balance': fees_with_balance,
+        'fees_with_balance': outstanding,
         'search_query': search_query,
         'selected_grade': grade_filter,
         'selected_year': year_filter,
-        'grades': list(CURRENT_YEAR_FEES.keys()),
+        'selected_term': term_filter,
+        'grades': grades,
         'years': years,
-        'terms': terms,  # now defined
-    }
-
-    return render(request, 'fees/list_fees.html', context)
-
-
-
-# ----------------------------------
+        'terms': terms,
+        'current_term': current_term.name if current_term else None,
+    })
+     # ----------------------------------
 # Get student info (AJAX)
 # ----------------------------------
 @login_required
@@ -230,116 +344,240 @@ def search_students(request):
 
     return JsonResponse(results, safe=False)
 
-# -------------------------------
-# Fee Receipt (HTML)
-# -------------------------------
 @login_required
-def fee_receipt(request, fee_id, download=False):
+def fee_receipt(request, fee_id):
+    """
+    View a single fee receipt.
+    - Shows current payment and term balances.
+    - Supports print mode via ?print=1
+    """
+
     fee = get_object_or_404(Fee, id=fee_id)
+    student = fee.student
+    print_mode = request.GET.get('print') == '1'
 
-    # Use .term.name here as well
-    term_fee = CURRENT_YEAR_FEES.get(fee.student.student_grade, {}).get(fee.term.name, 0)
+    # -----------------------------
+    # All fees for this student
+    # -----------------------------
+    student_fees = (
+        Fee.objects
+        .filter(student=student)
+        .select_related('term')
+        .values(
+            'payment_year',
+            'term__name',
+            'term__id',
+            'student__is_boarder'
+        )
+        .annotate(
+            total_paid=Sum('amount_paid'),
+            total_old_arrears=Sum('old_arrears')
+        )
+        .order_by('payment_year', 'term__id')
+    )
 
-    if getattr(fee.student, 'is_boarder', 'No') == "Yes":
-        term_fee += BOARDING_FEE
+    term_balances = OrderedDict()
+    carry_forward = Decimal('0.00')
 
-    total_paid = Fee.objects.filter(
-        student=fee.student,
-        payment_year=fee.payment_year,
-        term=fee.term
-    ).aggregate(total=Sum('amount_paid'))['total'] or 0
+    # 🔥 Load FeeAdjustment model safely
+    from django.apps import apps
+    FeeAdjustmentModel = apps.get_model('fees', 'FeeAdjustment')
 
-    balance = float(fee.old_arrears or 0) + float(term_fee) - float(total_paid)
+    for f in student_fees:
+
+        year = f['payment_year']
+        term_name = f['term__name'] if f['term__name'] else "N/A"
+
+        # ✅ Fee Structure Lookup
+        structure = FeeStructure.objects.filter(
+            grade=student.student_grade,
+            term=term_name,
+            academic_year__name=str(year)
+        ).first()
+
+        if structure:
+            term_fee = Decimal(structure.amount)
+
+            if student.is_boarder == "Yes":
+                term_fee += Decimal(structure.boarding_amount)
+        else:
+            term_fee = Decimal('0.00')
+
+        old_arrears = Decimal(f['total_old_arrears'] or 0)
+        paid = Decimal(f['total_paid'] or 0)
+
+        # ⭐ Attendance / Adjustment deduction
+        deduction = Decimal('0.00')
+
+        adj = FeeAdjustmentModel.objects.filter(
+            student=student,
+            term__name=term_name,
+            academic_year=year
+        ).first()
+
+        if adj:
+            if adj.status == "ABSENT":
+                deduction = term_fee + old_arrears
+            elif adj.status == "CLEARED":
+                deduction = old_arrears
+            else:
+                deduction = Decimal(adj.deduction_amount or 0)
+
+        # Carry forward + balance logic
+        total_due = term_fee + old_arrears - carry_forward
+        balance = total_due - paid - deduction
+
+        if balance < 0:
+            carry_forward = -balance
+            balance = Decimal('0.00')
+        else:
+            carry_forward = Decimal('0.00')
+
+        if year not in term_balances:
+            term_balances[year] = {}
+
+        term_balances[year][term_name] = {
+            'fee': term_fee,
+            'old_arrears': old_arrears,
+            'paid': paid,
+            'balance': max(balance, Decimal('0.00')),
+            'carry_forward': carry_forward,
+        }
 
     context = {
         'fee': fee,
-        'total_fee': term_fee,
-        'total_paid': total_paid,
-        'balance': balance,
-        'amount_in_words': num2words(fee.amount_paid, to='currency', lang='en'),
+        'student': student,
+        'term_balances': term_balances,
+        'print_mode': print_mode,
+        'current_payment_amount': fee.amount_paid,
+        'receipt_no': fee.receipt_number,
         'school_name': 'ST JOSEPH PREPARATORY SCHOOL',
-        'logo_url': request.build_absolute_uri(static('students_app/images/pass.png')),
-        'download': download,
+        'logo_url': logo_data_url,
     }
+
     return render(request, 'fees/receipt.html', context)
-
-
-
+   
 # ----------------------------------
-# Generate PDF Receipt
+# Generate PDF Receipt (Display + Save Offline)
 # ----------------------------------
+
+
 @login_required
 def generate_receipt(request, fee_id):
     try:
-        fee = get_object_or_404(Fee, id=fee_id)
+        with transaction.atomic():
+            fee = get_object_or_404(Fee.objects.select_for_update(), id=fee_id)
 
-        # Correct term lookup
-        term_fee = CURRENT_YEAR_FEES.get(fee.student.student_grade, {}).get(fee.term.name, 0)
-        if getattr(fee.student, 'is_boarder', 'No') == "Yes":
-            term_fee += BOARDING_FEE
+            # ------------------------------
+            # Generate receipt number if missing
+            # ------------------------------
+            if not fee.receipt_number:
+                last_number = Fee.objects.aggregate(max_no=Max('receipt_number'))['max_no']
+                fee.receipt_number = (last_number + 1) if last_number else 1001
+                fee.save(update_fields=['receipt_number'])
 
-        # Total amount paid so far for this term
-        total_paid = Fee.objects.filter(
-            student=fee.student,
-            payment_year=fee.payment_year,
-            term=fee.term
-        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+            # ------------------------------
+            # Get Fee Structure
+            # ------------------------------
+            term_name = fee.term.name if fee.term else "N/A"
 
-        balance = float(fee.old_arrears or 0) + float(term_fee) - float(total_paid)
+            structure = FeeStructure.objects.filter(
+                grade=fee.student.student_grade,
+                term=term_name,
+                academic_year__name=str(fee.payment_year)
+            ).first()
 
-        amount_in_words = num2words(fee.amount_paid, to='currency', lang='en').capitalize()
+            if structure:
+                term_fee = Decimal(structure.amount)
+                if fee.student.is_boarder == "Yes":
+                    term_fee += Decimal(structure.boarding_amount)
+            else:
+                term_fee = Decimal('0.00')
 
-        html = render_to_string('fees/receipt.html', {
-            'fee': fee,
-            'total_fee': term_fee,
-            'amount_in_words': amount_in_words,
-            'balance': balance,
-            'school_name': 'ST JOSEPH PREPARATORY SCHOOL'
-        })
+            # ------------------------------
+            # Compute total paid and balance with adjustment
+            # ------------------------------
+            total_paid = Fee.objects.filter(
+                student=fee.student,
+                payment_year=fee.payment_year,
+                term=fee.term
+            ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
 
-        if not os.path.exists(settings.MEDIA_ROOT):
-            os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
+            # 🔹 Apply FeeAdjustment if exists
+            from django.apps import apps
+            FeeAdjustmentModel = apps.get_model('fees', 'FeeAdjustment')
 
-        temp_pdf_path = os.path.join(settings.MEDIA_ROOT, f"temp_receipt_{fee.id}.pdf")
+            deduction = Decimal('0.00')
+            adj = FeeAdjustmentModel.objects.filter(
+                student=fee.student,
+                term=fee.term,
+                academic_year=fee.payment_year
+            ).first()
 
-        # Generate PDF
-        with open(temp_pdf_path, "wb") as f:
-            result = pisa.CreatePDF(src=html, dest=f)
-            if result.err:
-                messages.error(request, "Error generating PDF. Check your template HTML.")
-                return redirect('fee_receipt', fee_id=fee.id)
+            if adj:
+                if adj.status == "ABSENT":
+                    deduction = term_fee + Decimal(fee.old_arrears or 0)
+                elif adj.status == "CLEARED":
+                    deduction = Decimal(fee.old_arrears or 0)
+                else:
+                    deduction = Decimal(adj.deduction_amount or 0)
 
-        # Save PDF to Fee model
-        with open(temp_pdf_path, "rb") as f:
-            django_file = File(f)
-            pdf_filename = f"receipt_{fee.id}.pdf"
-            fee.receipt.save(pdf_filename, django_file, save=True)
+            balance = max(Decimal('0.00'), (term_fee + Decimal(fee.old_arrears or 0)) - total_paid - deduction)
 
-        # Log receipt generation
-        ActivityLog.objects.create(
-            user=request.user,
-            action='RECEIPT_GENERATE',
-            description=f"Generated receipt for {fee.student.name} (Adm: {fee.student.admission_number}), Amount: Kshs {fee.amount_paid}"
-        )
+            # Amount in words
+            amount_in_words = num2words(fee.amount_paid, to='currency', lang='en').capitalize()
 
-        # Remove temp file
-        if os.path.exists(temp_pdf_path):
-            os.remove(temp_pdf_path)
+            # ------------------------------
+            # Prepare logo URL
+            # ------------------------------
+            logo_url = logo_data_url
 
-        # Return PDF in browser
-        with open(fee.receipt.path, "rb") as f:
-            response = HttpResponse(f.read(), content_type="application/pdf")
+            # ------------------------------
+            # Render HTML template
+            # ------------------------------
+            html_string = render_to_string('fees/receipt.html', {
+                'fee': fee,
+                'receipt_no': fee.receipt_number,
+                'total_fee': term_fee,
+                'amount_in_words': amount_in_words,
+                'balance': balance,
+                'current_payment_amount': fee.amount_paid,
+                'school_name': 'ST JOSEPH PREPARATORY SCHOOL',
+                'logo_url': logo_url,
+                'term_balances': {},
+                'term_data': {'balance': balance},
+            })
+
+            # ------------------------------
+            # Generate PDF
+            # ------------------------------
+            pdf_buffer = BytesIO()
+            HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf(pdf_buffer)
+            pdf_buffer.seek(0)
+
+            pdf_filename = f"receipt_{fee.receipt_number}.pdf"
+
+            # Save PDF to media
+            fee.receipt.save(pdf_filename, ContentFile(pdf_buffer.getvalue()), save=True)
+
+            # Log activity
+            ActivityLog.objects.create(
+                user=request.user,
+                action='RECEIPT_GENERATED',
+                description=f"Generated receipt {fee.receipt_number} for {fee.student.name} "
+                            f"(Adm: {fee.student.admission_number})"
+            )
+
+            # Return PDF in browser
+            response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
             response['Content-Disposition'] = f'inline; filename="{pdf_filename}"'
             return response
 
     except Exception as e:
         import traceback
-        tb = traceback.format_exc()
-        messages.error(request, f"An error occurred while generating the receipt: {e}")
-        print(f"[DEBUG generate_receipt]\n{tb}")
+        print(traceback.format_exc())
+        messages.error(request, f"Error generating receipt: {e}")
         return redirect('fee_receipt', fee_id=fee_id)
-
-
 
 # -------------------------------
 # Download PDF Receipt
@@ -348,40 +586,66 @@ def generate_receipt(request, fee_id):
 def download_receipt(request, fee_id):
     fee = get_object_or_404(Fee, id=fee_id)
 
-    # Correct term lookup
-    term_fee = CURRENT_YEAR_FEES.get(fee.student.student_grade, {}).get(fee.term.name, 0)
-    if getattr(fee.student, 'is_boarder', 'No') == "Yes":
-        term_fee += BOARDING_FEE
+    # 🔥 Get FeeStructure dynamically
+    structure = FeeStructure.objects.filter(
+        grade=fee.student.student_grade,
+        term=fee.term.name,
+        academic_year__name=str(fee.payment_year)
+    ).first()
+
+    if structure:
+        term_fee = Decimal(structure.amount)
+        if fee.student.is_boarder == "Yes":
+            term_fee += Decimal(structure.boarding_amount)
+    else:
+        term_fee = Decimal('0.00')
 
     total_paid = Fee.objects.filter(
         student=fee.student,
         payment_year=fee.payment_year,
         term=fee.term
-    ).aggregate(total=Sum('amount_paid'))['total'] or 0
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
 
-    balance = float(fee.old_arrears or 0) + float(term_fee) - float(total_paid)
+    # 🔹 Apply FeeAdjustment if exists
+    from django.apps import apps
+    FeeAdjustmentModel = apps.get_model('fees', 'FeeAdjustment')
+
+    deduction = Decimal('0.00')
+    adj = FeeAdjustmentModel.objects.filter(
+        student=fee.student,
+        term=fee.term,
+        academic_year=fee.payment_year
+    ).first()
+
+    if adj:
+        if adj.status == "ABSENT":
+            deduction = term_fee + Decimal(fee.old_arrears or 0)
+        elif adj.status == "CLEARED":
+            deduction = Decimal(fee.old_arrears or 0)
+        else:
+            deduction = Decimal(adj.deduction_amount or 0)
+
+    balance = max(Decimal('0.00'), (term_fee + Decimal(fee.old_arrears or 0)) - total_paid - deduction)
 
     amount_in_words = num2words(fee.amount_paid, to='currency', lang='en').capitalize()
 
-    html = render_to_string('fees/receipt.html', {
+    html_string = render_to_string('fees/receipt.html', {
         'fee': fee,
         'total_fee': term_fee,
         'amount_in_words': amount_in_words,
         'balance': balance,
+        'receipt_no': fee.receipt_number,
         'school_name': 'ST JOSEPH PREPARATORY SCHOOL',
-        'logo_url': request.build_absolute_uri(static('students_app/images/pass.png')),
-        'download': True  # hides download button
+        'logo_url': logo_data_url,
+        'download': True,
     })
 
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="receipt_{fee.id}.pdf"'
+    pdf = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
 
-    pisa_status = pisa.CreatePDF(src=html, dest=response)
-    if pisa_status.err:
-        return HttpResponse("Error generating PDF. Please check template.")
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="receipt_{fee.receipt_number}.pdf"'
 
     return response
-
 @staff_member_required
 def dashboard(request):
     # ----------------------------
@@ -489,40 +753,132 @@ def log_user_logout(sender, request, user, **kwargs):
         action="Logged out"
     )
 
+# ----------------------------------
+# Redo / Reverse Payment
+# ----------------------------------
+@staff_member_required
+def redo_payment(request, fee_id):
+    fee = get_object_or_404(Fee, id=fee_id)
+
+    student_name = fee.student.name
+    admission = fee.student.admission_number
+    amount = fee.amount_paid
+
+    # Delete receipt file if it exists
+    if fee.receipt:
+        if os.path.isfile(fee.receipt.path):
+            os.remove(fee.receipt.path)
+
+    # Log action BEFORE deleting
+    ActivityLog.objects.create(
+        user=request.user,
+        action="PAYMENT_REVERSED",
+        description=f"Reversed payment of Kshs {amount} for {student_name} (Adm: {admission}) - Term {fee.term.name} {fee.payment_year}"
+    )
+
+    # Delete payment record
+    fee.delete()
+
+    messages.success(request, f"✅ Payment of Kshs {amount} reversed successfully.")
+
+    return redirect('list_fees')
+
+
+
 @login_required
-def add_fee(request):
-    """
-    Add a new fee payment for a student.
-    """
-    if request.method == "POST":
-        form = FeeForm(request.POST)
-        if form.is_valid():
-            fee = form.save(commit=False)
+def receipt_list(request):
+    search_query = request.GET.get('search', '').strip()
+    selected_grade = request.GET.get('grade', '')
+    selected_year = request.GET.get('year', '')
+    selected_term = request.GET.get('term', '')
 
-            # Ensure payment_year defaults to current year if not provided
-            if not fee.payment_year:
-                fee.payment_year = datetime.now().year
+    # Start with all Fee objects that have a receipt
+    receipts = Fee.objects.select_related('student', 'term').filter(receipt_number__isnull=False)
 
-            fee.save()
+    # Filter by search query (name, admission number, receipt number)
+    if search_query:
+        receipts = receipts.filter(
+            Q(student__name__icontains=search_query) |
+            Q(student__admission_number__icontains=search_query) |
+            Q(receipt_number__icontains=search_query)
+        )
 
-            # Log the fee addition
-            ActivityLog.objects.create(
-                user=request.user,
-                action='FEE_CREATE',
-                description=f"Added fee for {fee.student.name} (Adm: {fee.student.admission_number}), Amount: Kshs {fee.amount_paid}"
-            )
+    # Filter by grade
+    if selected_grade:
+        receipts = receipts.filter(student__student_grade=selected_grade)
 
-            messages.success(request, f"✅ Fee for {fee.student.name} recorded successfully.")
+    # Filter by payment year
+    if selected_year:
+        receipts = receipts.filter(payment_year=selected_year)
 
-            # Check if user clicked "Add Another"
-            if request.POST.get('action') == 'add_another':
-                form = FeeForm()
-            else:
-                return redirect('list_fees')
-        else:
-            messages.error(request, "❌ Please correct the errors below.")
+    # Filter by term
+    if selected_term:
+        receipts = receipts.filter(term__id=selected_term)
+
+    # Order by latest payment date first, then by ID to break ties
+    receipts = receipts.order_by('-payment_date', '-id')
+
+    # Get all distinct grades and years for filters
+    grades = Fee.objects.values_list('student__student_grade', flat=True).distinct()
+    years = Fee.objects.values_list('payment_year', flat=True).distinct()
+
+    context = {
+        'receipts': receipts,
+        'search_query': search_query,
+        'selected_grade': selected_grade,
+        'selected_year': selected_year,
+        'selected_term': selected_term,
+        'grades': grades,
+        'years': years,
+       
+    }
+    return render(request, 'fees/receipt_list.html', context)
+
+
+@login_required
+@staff_member_required
+def mark_fee_adjustment(request, fee_id, status):
+    fee = get_object_or_404(Fee, id=fee_id)
+
+    # Save adjustment log
+    FeeAdjustment.objects.create(
+        student=fee.student,
+        term=fee.term,
+        academic_year=fee.payment_year,
+        status=status
+    )
+
+    # Get fee structure
+    structure = FeeStructure.objects.filter(
+        grade=fee.student.student_grade,
+        term=fee.term.name,
+        academic_year__name=str(fee.payment_year)
+    ).first()
+
+    term_fee = Decimal("0.00")
+
+    if structure:
+        term_fee = Decimal(structure.amount)
+
+        if fee.student.is_boarder == "Yes":
+            term_fee += Decimal(structure.boarding_amount)
+
+    # ⭐ ABSENT = Exempt billing (Set amount_due to 0)
+    if status == "ABSENT":
+        fee.amount_due = Decimal("0.00")
+
+        # Do NOT add arrears
+        fee.old_arrears = Decimal("0.00")
+
+    # ⭐ CLEARED = Reset arrears
+    elif status == "CLEARED":
+        fee.old_arrears = Decimal("0.00")
+
+    # ⭐ PRESENT = Normal billing
     else:
-        form = FeeForm()
+        fee.amount_due = term_fee
 
-    return render(request, 'fees/add_fee.html', {'form': form})
-    print(form.errors)
+    fee.save()
+
+    messages.success(request, f"Fee marked as {status}")
+    return redirect("list_fees")

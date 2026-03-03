@@ -24,20 +24,12 @@ class Student(models.Model):
     email = models.EmailField(blank=True, null=True)
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     parent_name = models.CharField(max_length=100, blank=True)
-    
+    is_alumni = models.BooleanField(default=False)
+    year_of_completion = models.IntegerField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.name} ({self.admission_number})"
 
-# -----------------
-# Used Admission Numbers
-# -----------------
-class UsedAdmissionNumber(models.Model):
-    admission_number = models.CharField(max_length=50, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.admission_number
 
 # -----------------
 # Term Model
@@ -51,16 +43,44 @@ class Term(models.Model):
     def __str__(self):
         return f"{self.name} ({self.academic_year})"
 
+
 # -----------------
 # Fee Model
 # -----------------
 class Fee(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='fees')
-    term = models.ForeignKey(Term, on_delete=models.CASCADE, blank=True, null=True)  # Nullable now
+    term = models.ForeignKey(Term, on_delete=models.CASCADE, blank=True, null=True)  # ⚡ Keep nullable
     payment_year = models.IntegerField()
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=50, blank=True, null=True)
+    mpesa_code = models.CharField(max_length=20, blank=True, null=True)
     old_arrears = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
-        return f"{self.student.name} - {'No Term' if not self.term else self.term.name} - Kshs {self.amount_paid}"
+        term_name = self.term.name if self.term else "No Term"
+        return f"{self.student.name} - {term_name} - Kshs {self.amount_paid}"
+
+
+# -----------------
+# Used Admission Numbers
+# -----------------
+class UsedAdmissionNumber(models.Model):
+    admission_number = models.CharField(max_length=50, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.admission_number
+    
+
+    
+    def __str__(self):
+        return f"{self.name} ({self.admission_number})"
+ 
+class AcademicYear(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_current = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name

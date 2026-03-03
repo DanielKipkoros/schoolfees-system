@@ -14,4 +14,9 @@ urlpatterns = [
 
     path('dashboard/', views.dashboard, name='dashboard'),
     path('activity-logs/', activity_logs, name='activity_logs'),
+    path('redo-payment/<int:fee_id>/', views.redo_payment, name='redo_payment'),
+    path('receipts/', views.receipt_list, name='receipt_list'),
+    path( "fees/adjust/<int:fee_id>/<str:status>/", views.mark_fee_adjustment, name="mark_fee_adjustment"
+),
+
 ]

@@ -15,6 +15,8 @@ USE_TZ = True
 LOGIN_REDIRECT_URL = 'home'   # after login
 LOGOUT_REDIRECT_URL = 'login'      # after logout
 LOGIN_URL = 'login'
+REGISTRATION_FEE = 5000  # KES
+
 # ------------------------------
 # Applications
 # ------------------------------
@@ -24,14 +26,14 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'django.contrib.humanize',
     'django.contrib.staticfiles',
 
     # Your apps
     'students_app',
-    'fees',
     'widget_tweaks',
+    'fees.apps.FeesConfig',  # Only include the AppConfig, remove 'fees' duplicate
 ]
-
 # ------------------------------
 # Middleware
 # ------------------------------

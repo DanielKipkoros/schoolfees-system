@@ -6,20 +6,44 @@
 
 <div class="container py-4">
 
-    <!-- Page Header with Back Button and Print -->
+    <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="fw-bold text-primary">📋 Student List</h3>
+
         <div class="d-flex align-items-center">
-            <span class="badge bg-secondary p-2 me-3">Total: {{ students|length }}</span>
+            <span class="badge bg-secondary p-2 me-3">
+                Total: {{ students|length }}
+            </span>
+
             <button class="btn btn-success me-2" onclick="printStudents()">🖨 Print</button>
             <a href="{% url 'home' %}" class="btn btn-outline-primary">⬅ Back to Home</a>
         </div>
+    </div>
+
+    <!-- ✅ STATUS FILTER TOGGLES -->
+    <div class="mb-3">
+        <a href="?status=active"
+           class="btn btn-sm {% if status_filter == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+            Active Students
+        </a>
+
+        <a href="?status=alumni"
+           class="btn btn-sm {% if status_filter == 'alumni' %}btn-success{% else %}btn-outline-success{% endif %}">
+            Alumni
+        </a>
+
+        <a href="?"
+           class="btn btn-sm {% if not status_filter %}btn-dark{% else %}btn-outline-dark{% endif %}">
+            All Students
+        </a>
     </div>
 
     <!-- Filter Card -->
     <div class="card shadow-sm mb-4 border-0 rounded-3">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
+
+                <input type="hidden" name="status" value="{{ status_filter }}">
 
                 <!-- Search -->
                 <div class="col-md-3">
@@ -59,7 +83,6 @@
                     </select>
                 </div>
 
-                <!-- Filter Button -->
                 <div class="col-md-3 d-grid">
                     <button type="submit" class="btn btn-primary">🔍 Apply Filter</button>
                 </div>
@@ -68,14 +91,16 @@
         </div>
     </div>
 
-    <!-- Table Card -->
+    <!-- Table -->
     <div class="card shadow-sm border-0 rounded-3">
         <div class="card-header bg-dark text-white fw-semibold">
             Registered Students
         </div>
+
         <div class="card-body p-0">
             <div id="student-table">
                 <table class="table table-hover table-striped mb-0 align-middle">
+
                     <thead class="table-light text-center">
                         <tr>
                             <th>Adm No</th>
@@ -89,31 +114,57 @@
                             <th>Actions</th>
                         </tr>
                     </thead>
+
                     <tbody class="text-center">
                         {% for student in students %}
                         <tr>
+
                             <td class="fw-semibold">{{ student.admission_number }}</td>
-                            <td class="text-start">{{ student.name }}</td>
-                            <td><span class="badge bg-info text-dark">{{ student.student_grade }}</span></td>
+
+                            <td class="text-start">
+                                {{ student.name }}
+
+                                {% if student.is_alumni %}
+                                    <span class="badge bg-warning text-dark ms-1">
+                                        ALUMNI
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <span class="badge bg-info text-dark">
+                                    {{ student.student_grade }}
+                                </span>
+                            </td>
+
                             <td>{{ student.get_is_boarder_display }}</td>
                             <td>{{ student.get_gender_display }}</td>
                             <td>{{ student.date_of_birth|date:"Y-m-d" }}</td>
                             <td>{{ student.parent_name }}</td>
                             <td>{{ student.phone_number }}</td>
+
                             <td>
                                 <a href="{% url 'edit_student' student.admission_number %}"
                                    class="btn btn-sm btn-outline-warning mb-1">✏️ Edit</a>
+
                                 <a href="{% url 'delete_student' student.admission_number %}"
                                    class="btn btn-sm btn-outline-danger mb-1"
-                                   onclick="return confirm('Delete this student?');">🗑️ Delete</a>
+                                   onclick="return confirm('Delete this student?');">
+                                   🗑️ Delete
+                                </a>
                             </td>
+
                         </tr>
+
                         {% empty %}
                         <tr>
-                            <td colspan="9" class="text-center py-4 text-muted">😔 No students found</td>
+                            <td colspan="9" class="text-center py-4 text-muted">
+                                😔 No students found
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
+
                 </table>
             </div>
         </div>
@@ -124,30 +175,32 @@
 <!-- Print Script -->
 <script>
 function printStudents() {
-    // Clone the table
-    var table = document.getElementById('student-table').querySelector('table').cloneNode(true);
 
-    // Remove Actions column
+    var table = document.getElementById('student-table')
+        .querySelector('table')
+        .cloneNode(true);
+
     var ths = table.querySelectorAll('th');
-    var tdIndex = ths.length - 1; // last column
+    var tdIndex = ths.length - 1;
+
     table.querySelectorAll('tr').forEach(row => {
-        if(row.cells.length > tdIndex) {
+        if(row.cells.length > tdIndex){
             row.removeChild(row.cells[tdIndex]);
         }
     });
 
-    // Open print window
     var printWindow = window.open('', '', 'width=1200,height=800');
+
     printWindow.document.write(`
         <html>
         <head>
             <title>Student List</title>
             <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
             <style>
-                body { padding: 20px; font-size: 14px; }
-                table { width: 100%; border-collapse: collapse; }
-                th, td { border: 1px solid #000; padding: 6px; text-align: center; }
-                th { background-color: #f0f0f0; }
+                body { padding:20px; font-size:14px; }
+                table { width:100%; border-collapse:collapse; }
+                th, td { border:1px solid #000; padding:6px; text-align:center; }
+                th { background:#f0f0f0; }
             </style>
         </head>
         <body>
@@ -156,6 +209,7 @@ function printStudents() {
         </body>
         </html>
     `);
+
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();

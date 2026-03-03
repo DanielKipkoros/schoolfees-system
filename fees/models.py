@@ -3,6 +3,18 @@ from students_app.models import Student
 from datetime import datetime
 from django.utils import timezone
 from django.contrib.auth.models import User
+from decimal import Decimal
+from django.db.models import Max, Sum
+
+class AcademicYear(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_current = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name    
+
 
 class Term(models.Model):
     name = models.CharField(max_length=20)  # Term 1, Term 2, Term 3
@@ -15,63 +27,83 @@ class Term(models.Model):
 
 
 class Fee(models.Model):
- 
+
     PAYMENT_CHOICES = [
         ("Cash", "Cash"),
         ("Bank", "Bank"),
         ("Mpesa", "Mpesa"),
     ]
 
-    CURRENT_YEAR_FEES = {
-        'Baby Class': {'Term 1':11700, 'Term 2': 11700, 'Term 3': 11100},
-        'PP1': {'Term 1':11700, 'Term 2': 11700, 'Term 3': 11100},
-        'PP2': {'Term 1':11700, 'Term 2': 11700, 'Term 3': 11100},
-        'Grade 1': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-        'Grade 2': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-        'Grade 3': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-        'Grade 4': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-        'Grade 5': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-        'Grade 6': {'Term 1': 12750, 'Term 2': 12750, 'Term 3': 12400},
-        'Grade 7': {'Term 1': 13900, 'Term 2': 13900, 'Term 3': 13500},
-        'Grade 8': {'Term 1': 13900, 'Term 2': 13900, 'Term 3': 13500},
-        'Grade 9': {'Term 1': 13900, 'Term 2': 13900, 'Term 3': 13500},
-    }
-
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     term = models.ForeignKey(Term, on_delete=models.CASCADE)
-    payment_year = models.IntegerField(default=datetime.now().year)
-    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_year = models.IntegerField(default=datetime.now().year, blank=True, null=True)
+
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     payment_method = models.CharField(max_length=10, choices=PAYMENT_CHOICES, blank=True, null=True)
     mpesa_code = models.CharField(max_length=20, blank=True, null=True)
-    old_arrears = models.FloatField(default=0)
+    old_arrears = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+
     payment_date = models.DateField(default=timezone.now)
     receipt = models.FileField(upload_to='receipts/%Y/%m/%d/', null=True, blank=True)
     date_paid = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    academic_year = models.ForeignKey(
+    AcademicYear,
+    on_delete=models.PROTECT,
+    null=True,
+    blank=True,
+    related_name="fees"
+    )
+    receipt_number = models.PositiveBigIntegerField(
+        unique=True,
+        null=True,
+        blank=True
+    )
+    
+    
 
     def __str__(self):
         return f"{self.student} - {self.term} - {self.payment_year} - {self.amount_paid}"
 
-    @property
-    def balance(self):
-        """
-        Calculates the balance for this student and term:
-        balance = fee for this term + old arrears - sum of all payments made
-        """
-        student_grade = getattr(self.student, "grade", None)
-        if not student_grade:
-            return 0
 
-        # Get the fee for this student's grade and term
-        term_fee = self.CURRENT_YEAR_FEES.get(student_grade, {}).get(self.term.name, 0)
+  
 
-        # Sum all payments the student has made
-        total_paid = Fee.objects.filter(student=self.student).aggregate(
-            total=models.Sum("amount_paid")
-        )["total"] or 0
+    def __str__(self):
+        return f"{self.student} - {self.term} - {self.payment_year} - {self.amount_paid}"
 
-        # Add old arrears
-        total_balance = term_fee + (self.old_arrears or 0) - float(total_paid)
-        return max(total_balance, 0)
+@property
+def balance(self):
+    """
+    Calculates balance for this student in this specific term & year.
+    """
+
+    from .models import FeeStructure
+
+    # Get correct fee structure
+    try:
+        structure = FeeStructure.objects.get(
+            grade=self.student.student_grade,
+            term=self.term.name,
+            academic_year=self.payment_year
+        )
+    except FeeStructure.DoesNotExist:
+        return Decimal('0.00')
+
+    term_fee = Decimal(structure.amount)
+
+    if getattr(self.student, 'is_boarder', 'No') == "Yes":
+        term_fee += Decimal(structure.boarding_amount)
+
+    # Only payments for same student + same term + same year
+    total_paid = Fee.objects.filter(
+        student=self.student,
+        term=self.term,
+        payment_year=self.payment_year
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+
+    total_balance = Decimal(self.old_arrears or 0) + term_fee - total_paid
+
+    return max(total_balance, Decimal('0.00'))
 
     @property
     def is_generated(self):
@@ -89,8 +121,10 @@ class ActivityLog(models.Model):
         ('STUDENT_UPDATE', 'Student Updated'),
         ('STUDENT_DELETE', 'Student Deleted'),
         ('RECEIPT_GENERATE', 'Receipt Generated'),
+        ('STUDENT_PROMOTE', 'Student Promoted'),
+        ('STUDENT_EDITED', 'Student Edited'),
     ]
-
+    
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     action = models.CharField(max_length=30, choices=ACTION_TYPES)
     description = models.TextField()
@@ -98,3 +132,86 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.action} - {self.timestamp}"
+
+
+class FeeStructure(models.Model):
+
+    ACADEMIC_TERMS = [
+        ('Term 1', 'Term 1'),
+        ('Term 2', 'Term 2'),
+        ('Term 3', 'Term 3'),
+    ]
+
+    # -----------------------------
+    # Academic Year Reference ⭐ (Professional Design)
+    # -----------------------------
+    academic_year = models.ForeignKey(
+        "AcademicYear",
+        on_delete=models.PROTECT,
+        related_name="fee_structures",
+        help_text="Academic year for this fee structure"
+    )
+
+    # -----------------------------
+    # Grade / Class
+    # -----------------------------
+    grade = models.CharField(
+        max_length=50,
+        help_text="Class or grade level"
+    )
+
+    # -----------------------------
+    # Term
+    # -----------------------------
+    term = models.CharField(
+        max_length=10,
+        choices=ACADEMIC_TERMS
+    )
+
+    # -----------------------------
+    # Financial Fields
+    # -----------------------------
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    boarding_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
+    # -----------------------------
+    # Metadata
+    # -----------------------------
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ('grade', 'term', 'academic_year')
+        ordering = ['academic_year', 'grade', 'term']
+
+    def __str__(self):
+        return f"{self.grade} - {self.term} ({self.academic_year})"
+
+class FeeAdjustment(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    term = models.ForeignKey(Term, on_delete=models.CASCADE)
+    academic_year = models.PositiveIntegerField()
+
+    status_choices = [
+        ("PRESENT", "Present / Billable"),
+        ("ABSENT", "Not Present / Exempted"),
+        ("CLEARED", "Cleared"),
+    ]
+
+    status = models.CharField(max_length=20, choices=status_choices)
+
+    deduction_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+ 

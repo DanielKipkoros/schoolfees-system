@@ -64,9 +64,14 @@
                 📊 Reports
             </a>
         </div>
-        
-       
 
+        <!-- View Receipts Button -->
+        <div class="col-md-3">
+            <a href="{% url 'receipt_list' %}" class="btn btn-secondary w-100 p-3">
+                🧾 View Receipts
+            </a>
+        </div>
+        
         <!-- Activity Logs Button (Staff Only) -->
         {% if request.user.is_staff %}
         <div class="col-md-3">
@@ -75,9 +80,48 @@
             </a>
         </div>
         {% endif %}
+
+        <!-- Promote Students Button (Staff Only with confirmation) -->
+        {% if request.user.is_staff %}
+        <div class="col-md-3">
+            <form method="post" action="{% url 'promote_students' %}" id="promoteForm">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary w-100 p-3">
+                    🎓 Promote Students
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- Undo Last Promotion Button (Staff Only with confirmation) -->
+        {% if request.user.is_staff %}
+        <div class="col-md-3">
+            <form method="post" action="{% url 'redo_promotion' %}" id="redoForm">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger w-100 p-3">
+                    🔄 Undo Last Promotion
+                </button>
+            </form>
+        </div>
+        {% endif %}
         
     </div>
 </div>
+
+<!-- JS Confirmation for Promote / Redo -->
+<script>
+document.getElementById('promoteForm')?.addEventListener('submit', function(e){
+    if(!confirm('⚠️ Are you sure you want to promote all students? This action cannot be undone easily.')){
+        e.preventDefault();
+    }
+});
+
+document.getElementById('redoForm')?.addEventListener('submit', function(e){
+    if(!confirm('⚠️ Are you sure you want to undo the last promotion?')){
+        e.preventDefault();
+    }
+});
+</script>
 
 </body>
 </html>

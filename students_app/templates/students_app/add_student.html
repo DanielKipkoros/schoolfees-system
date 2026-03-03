@@ -20,18 +20,6 @@
                 <a href="{% url 'home' %}" class="btn btn-primary btn-sm">⬅ Back to Home</a>
             </div>
 
-            <!-- Last & Next Admission Numbers -->
-            <div class="mb-3">
-                <p class="mb-1">
-                    📌 Last Admission Number: 
-                    <strong>{{ last_admission_number|default:"None Yet" }}</strong>
-                </p>
-                <p class="mb-3">
-                    💡 Next Admission Number: 
-                    <strong>{{ next_admission_number }}</strong>
-                </p>
-            </div>
-
             <!-- Flash Messages -->
             {% if messages %}
                 {% for message in messages %}
@@ -85,8 +73,6 @@
                         {{ form.gender|add_class:"form-select" }}
                     </div>
                 </div>
-
-                
 
                 <!-- Date of Birth & Contact -->
                 <div class="row g-3 mt-3">

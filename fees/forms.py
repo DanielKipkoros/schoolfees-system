@@ -1,3 +1,4 @@
+# forms.py
 from django import forms
 from .models import Fee
 from students_app.models import Student
@@ -13,27 +14,9 @@ class FeeForm(forms.ModelForm):
         })
     )
 
-    student_name = forms.CharField(
-        label="Student Name",
-        required=False,
-        widget=forms.TextInput(attrs={
-            "class": "form-control",
-            "readonly": "readonly"
-        })
-    )
-
-    student_grade = forms.CharField(
-        label="Grade",
-        required=False,
-        widget=forms.TextInput(attrs={
-            "class": "form-control",
-            "readonly": "readonly"
-        })
-    )
-
     class Meta:
         model = Fee
-        exclude = ['student', 'receipt', 'date_paid']
+        exclude = ['student']
         widgets = {
             "term": forms.Select(attrs={"class": "form-select"}),
             "amount_paid": forms.NumberInput(attrs={
@@ -73,20 +56,13 @@ class FeeForm(forms.ModelForm):
         mpesa_code = cleaned_data.get("mpesa_code")
 
         if payment_method == "Mpesa" and not mpesa_code:
-            self.add_error(
-                "mpesa_code",
-                "MPESA Code is required when payment method is Mpesa."
-            )
+            self.add_error("mpesa_code", "MPESA Code is required when payment method is Mpesa.")
 
         return cleaned_data
 
     def save(self, commit=True):
         fee = super().save(commit=False)
-
-        # Attach the student from clean_admission_number
         fee.student = getattr(self, 'student', None)
-
         if commit:
             fee.save()
-
         return fee
